@@ -27,7 +27,7 @@ open_system(model);
 
 % 仿真设置
 set_param(model, 'Solver', 'ode45');
-set_param(model, 'StopTime', '30');
+set_param(model, 'StopTime', '10');
 set_param(model, 'MaxStep', '1e-3');
 set_param(model, 'SaveTime', 'on', 'TimeSaveName', 'tout');
 set_param(model, 'SaveOutput', 'on', 'OutputSaveName', 'yout');
@@ -212,26 +212,53 @@ do = [model '/Disturbance_Observer'];
 delete_block([do '/In1']);
 delete_block([do '/Out1']);
 
-% 输入：omega, J_t, M
+% 输入：omega, J_t, M, D_t, theta
 add_block('simulink/Sources/In1', [do '/omega_in'], 'Position', [30, 50, 60, 70]);
 add_block('simulink/Sources/In1', [do '/Jt_in'], 'Position', [30, 100, 60, 120]);
 add_block('simulink/Sources/In1', [do '/M_in'], 'Position', [30, 150, 60, 170]);
+add_block('simulink/Sources/In1', [do '/Dt_in'], 'Position', [30, 200, 60, 220]);
+add_block('simulink/Sources/In1', [do '/theta_in'], 'Position', [30, 250, 60, 270]);
 
+% 计算 omega 的导数
 add_block('simulink/Continuous/Derivative', [do '/Omega_Derivative'], 'Position', [95, 45, 135, 75]);
+
+% 计算 J_t * d(omega)/dt
 add_block('simulink/Math Operations/Product', [do '/J_OmegaDot_Product'], 'Position', [170, 65, 210, 95]);
-add_block('simulink/Math Operations/Subtract', [do '/Residual_Sum'], 'Position', [245, 95, 275, 125]);
+
+% 计算 D_t * omega（已知阻尼项）
+add_block('simulink/Math Operations/Product', [do '/Domega_Product'], 'Position', [170, 195, 210, 225]);
+
+% 计算 K_theta * theta（已知恢复力项）
+add_block('simulink/Math Operations/Gain', [do '/Ktheta_Gain'], 'Position', [170, 245, 210, 275]);
+set_param([do '/Ktheta_Gain'], 'Gain', 'K_theta');
+
+% 计算残差：Residual = M - J*dω/dt - D*ω - K*θ
+add_block('simulink/Math Operations/Add', [do '/Residual_Sum'], 'Position', [245, 95, 275, 125]);
+set_param([do '/Residual_Sum'], 'Inputs', '+---');  % M - J*dω/dt - D*ω - K*θ
+
+% 低通滤波器
 add_block('simulink/Continuous/Transfer Fcn', [do '/ESO_LPF'], 'Position', [310, 95, 380, 125]);
 set_param([do '/ESO_LPF'], 'Numerator', '[1]', 'Denominator', '[tau_eso 1]');
 
 % 输出：d_hat
 add_block('simulink/Sinks/Out1', [do '/dhat_out'], 'Position', [415, 100, 445, 120]);
 
-% 连线
+% 连线（修正符号）
 add_line(do, 'omega_in/1', 'Omega_Derivative/1');
 add_line(do, 'Omega_Derivative/1', 'J_OmegaDot_Product/1');
 add_line(do, 'Jt_in/1', 'J_OmegaDot_Product/2');
-add_line(do, 'J_OmegaDot_Product/1', 'Residual_Sum/1');
-add_line(do, 'M_in/1', 'Residual_Sum/2');
+
+% 已知动力学项
+add_line(do, 'Dt_in/1', 'Domega_Product/1');
+add_line(do, 'omega_in/1', 'Domega_Product/2');
+add_line(do, 'theta_in/1', 'Ktheta_Gain/1');
+
+% 残差计算（修正符号：M - J*dω/dt - D*ω - K*θ）
+add_line(do, 'M_in/1', 'Residual_Sum/1');              % input1: M（正）
+add_line(do, 'J_OmegaDot_Product/1', 'Residual_Sum/2'); % input2: J*dω/dt（负）
+add_line(do, 'Domega_Product/1', 'Residual_Sum/3');     % input3: D*ω（负）
+add_line(do, 'Ktheta_Gain/1', 'Residual_Sum/4');        % input4: K*θ（负）
+
 add_line(do, 'Residual_Sum/1', 'ESO_LPF/1');
 add_line(do, 'ESO_LPF/1', 'dhat_out/1');
 
@@ -271,6 +298,36 @@ set_param([wd '/Delta_D'], 'Value', 'D_water-D_air');
 add_block('simulink/Math Operations/Product', [wd '/D_Delta_Product'], 'Position', [530, 100, 570, 130]);
 add_block('simulink/Math Operations/Add', [wd '/D_t_Sum'], 'Position', [600, 90, 630, 120]);
 
+% ========== 入水冲击项建模 ==========
+% 目标：M_total = M + A_impact * exp(-(t - t_enter)/tau_impact), t >= t_enter
+
+% 时间偏移：计算 (t - t_enter)
+add_block('simulink/Sources/Clock', [wd '/Clock_Impact']);
+add_block('simulink/Sources/Constant', [wd '/Neg_t_enter_Impact']);
+set_param([wd '/Neg_t_enter_Impact'], 'Value', '-t_enter');
+add_block('simulink/Math Operations/Add', [wd '/Time_Shift_Impact']);
+
+% 指数衰减：exp(-(t - t_enter)/tau_impact)
+add_block('simulink/Math Operations/Gain', [wd '/Impact_Decay']);
+set_param([wd '/Impact_Decay'], 'Gain', '-1/tau_impact');
+add_block('simulink/Math Operations/Math Function', [wd '/Exp_Impact']);
+set_param([wd '/Exp_Impact'], 'Operator', 'exp');
+
+% 冲击幅值
+add_block('simulink/Sources/Constant', [wd '/Impact_Amp']);
+set_param([wd '/Impact_Amp'], 'Value', 'A_impact');
+add_block('simulink/Math Operations/Product', [wd '/Impact_Product']);
+
+% 触发条件：(t - t_enter) >= 0
+add_block('simulink/Logic and Bit Operations/Compare To Constant', [wd '/Impact_Enable']);
+set_param([wd '/Impact_Enable'], 'const', '0', 'relop', '>=');
+
+% Switch：仅在 t >= t_enter 时输出冲击
+add_block('simulink/Signal Routing/Switch', [wd '/Impact_Switch']);
+
+% M_total = M + Impact
+add_block('simulink/Math Operations/Add', [wd '/M_with_Impact']);
+
 % 动力学主方程：J*omega_dot = M - D*omega + K*theta
 add_block('simulink/Math Operations/Product', [wd '/Domega_Product'], 'Position', [220, 170, 260, 200]);
 add_block('simulink/Math Operations/Gain', [wd '/Ktheta_Gain'], 'Position', [220, 220, 270, 250]);
@@ -298,24 +355,46 @@ add_line(wd, 'Clock/1', 'Time_Shift/1');
 add_line(wd, 'Neg_t_enter/1', 'Time_Shift/2');
 add_line(wd, 'Time_Shift/1', 'Inv_t_blend/1');
 add_line(wd, 'Inv_t_blend/1', 'Ratio_Sat/1');
-add_line(wd, 'Ratio_Sat/1', 'Smoothstep/1');
+% 绕过 Smoothstep，直接使用 Ratio_Sat 实现阶跃式入水
 
-add_line(wd, 'Smoothstep/1', 'J_Delta_Product/1');
+add_line(wd, 'Ratio_Sat/1', 'J_Delta_Product/1');
 add_line(wd, 'Delta_J/1', 'J_Delta_Product/2');
 add_line(wd, 'J_air/1', 'J_t_Sum/1');
 add_line(wd, 'J_Delta_Product/1', 'J_t_Sum/2');
 
-add_line(wd, 'Smoothstep/1', 'D_Delta_Product/1');
+add_line(wd, 'Ratio_Sat/1', 'D_Delta_Product/1');
 add_line(wd, 'Delta_D/1', 'D_Delta_Product/2');
 add_line(wd, 'D_air/1', 'D_t_Sum/1');
 add_line(wd, 'D_Delta_Product/1', 'D_t_Sum/2');
+
+% ========== 冲击项连线 ==========
+% 时间偏移：Clock_Impact + (-t_enter) = (t - t_enter)
+add_line(wd, 'Clock_Impact/1', 'Time_Shift_Impact/1');
+add_line(wd, 'Neg_t_enter_Impact/1', 'Time_Shift_Impact/2');
+
+% 指数衰减链：(t - t_enter) → Gain(-1/tau) → Exp
+add_line(wd, 'Time_Shift_Impact/1', 'Impact_Decay/1');
+add_line(wd, 'Impact_Decay/1', 'Exp_Impact/1');
+
+% 幅值：Exp × A_impact → Impact
+add_line(wd, 'Exp_Impact/1', 'Impact_Product/1');
+add_line(wd, 'Impact_Amp/1', 'Impact_Product/2');
+
+% 触发条件：(t - t_enter) >= 0
+add_line(wd, 'Time_Shift_Impact/1', 'Impact_Enable/1');
+
+% Switch：Impact_Product → in1, Impact_Enable → cond, 0 → in2 (默认)
+add_line(wd, 'Impact_Product/1', 'Impact_Switch/1');
+add_line(wd, 'Impact_Enable/1', 'Impact_Switch/2');
 
 % 连线：动力学方程
 add_line(wd, 'D_t_Sum/1', 'Domega_Product/1');
 add_line(wd, 'Omega_Int/1', 'Domega_Product/2');
 add_line(wd, 'Theta_Int/1', 'Ktheta_Gain/1');
 
-add_line(wd, 'M_in/1', 'OmegaDot_Num/1');
+add_line(wd, 'M_in/1', 'M_with_Impact/1');
+add_line(wd, 'Impact_Switch/1', 'M_with_Impact/2');
+add_line(wd, 'M_with_Impact/1', 'OmegaDot_Num/1');
 add_line(wd, 'Domega_Product/1', 'OmegaDot_Num/2');
 add_line(wd, 'Ktheta_Gain/1', 'OmegaDot_Num/3');
 
@@ -329,7 +408,7 @@ add_line(wd, 'Omega_Int/1', 'omega_out/1');
 add_line(wd, 'Theta_Int/1', 'theta_out/1');
 add_line(wd, 'J_t_Sum/1', 'Jt_out/1');
 add_line(wd, 'D_t_Sum/1', 'Dt_out/1');
-add_line(wd, 'Smoothstep/1', 'ratio_out/1');
+add_line(wd, 'Ratio_Sat/1', 'ratio_out/1');
 
 %% ===== 顶层连线 =====
 % Water_Dynamics -> Signal_Interface
@@ -351,6 +430,8 @@ add_line(model, 'Variable_PID/1', 'Signal_Interface/3', 'Autorouting', 'on');   
 add_line(model, 'Water_Dynamics/1', 'Disturbance_Observer/1', 'Autorouting', 'on'); % omega
 add_line(model, 'Water_Dynamics/3', 'Disturbance_Observer/2', 'Autorouting', 'on'); % J_t
 add_line(model, 'M_Comp/1', 'Disturbance_Observer/3', 'Autorouting', 'on');         % M
+add_line(model, 'Water_Dynamics/4', 'Disturbance_Observer/4', 'Autorouting', 'on'); % D_t
+add_line(model, 'Water_Dynamics/2', 'Disturbance_Observer/5', 'Autorouting', 'on'); % theta
 
 % Disturbance_Observer -> M_Comp 与 Signal_Interface
 add_line(model, 'Disturbance_Observer/1', 'M_Comp/2', 'Autorouting', 'on');      % d_hat
@@ -384,9 +465,9 @@ Kd_theta = 0.8;
 Kp0_omega = 50;  % 极小增益
 Ki0_omega = 0.8;    % 完全不用积分
 Kd0_omega = 0.1;  % 小微分增益
-a_omega = 0;
-b_omega = 0;
-c_theta = 0;
+a_omega =550;
+b_omega = 4;
+c_theta = 4;
 
 % 入水动力学
 J_air = 5;
@@ -399,10 +480,14 @@ K_theta = 1.2;
 theta0 = 0;
 omega0 = 0;
 t_enter = 2.0;
-t_blend = 1.0;
+t_blend = 0.02;   % 20 ms 毫秒级入水
 
-% 观测器（禁用以测试稳定性）
-tau_eso = 1000;  % 极大值，等效于禁用
+% 入水冲击参数
+A_impact = 100;      % 冲击强度（建议100~300）
+tau_impact = 0.05;   % 衰减时间常数（20ms）
+
+% 观测器（修正后使用适中参数）
+tau_eso = 0.01;  % 适中值，平衡响应速度和噪声抑制
 
 assignin('base', 'theta_ref', theta_ref);
 assignin('base', 'Kp_theta', Kp_theta);
@@ -423,6 +508,8 @@ assignin('base', 'theta0', theta0);
 assignin('base', 'omega0', omega0);
 assignin('base', 't_enter', t_enter);
 assignin('base', 't_blend', t_blend);
+assignin('base', 'A_impact', A_impact);
+assignin('base', 'tau_impact', tau_impact);
 assignin('base', 'tau_eso', tau_eso);
 
 %% 保存
