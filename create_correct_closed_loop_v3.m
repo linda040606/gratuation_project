@@ -328,13 +328,19 @@ add_block('simulink/Signal Routing/Switch', [wd '/Impact_Switch']);
 % M_total = M + Impact
 add_block('simulink/Math Operations/Add', [wd '/M_with_Impact']);
 
-% 动力学主方程：J*omega_dot = M - D*omega + K*theta
+% J̇·ω项：对α(t)求导得到dJ/dt，再乘以ω
+add_block('simulink/Continuous/Derivative', [wd '/Jdot_Deriv'], 'Position', [280, 70, 320, 100]);
+add_block('simulink/Math Operations/Gain', [wd '/Jdot_Gain'], 'Position', [345, 70, 385, 100]);
+set_param([wd '/Jdot_Gain'], 'Gain', 'J_water-J_air');
+add_block('simulink/Math Operations/Product', [wd '/Jdot_Omega_Product'], 'Position', [410, 70, 450, 100]);
+
+% 动力学主方程：J*omega_dot = M - D*omega - K*theta - Jdot*omega
 add_block('simulink/Math Operations/Product', [wd '/Domega_Product'], 'Position', [220, 170, 260, 200]);
 add_block('simulink/Math Operations/Gain', [wd '/Ktheta_Gain'], 'Position', [220, 220, 270, 250]);
 set_param([wd '/Ktheta_Gain'], 'Gain', 'K_theta');
 
 add_block('simulink/Math Operations/Add', [wd '/OmegaDot_Num'], 'Position', [300, 165, 330, 205]);
-set_param([wd '/OmegaDot_Num'], 'Inputs', '+--');  % 修正：M - D·ω - K·θ
+set_param([wd '/OmegaDot_Num'], 'Inputs', '+---');  % M - D·ω - K·θ - J̇·ω
 
 add_block('simulink/Math Operations/Divide', [wd '/Divide_J'], 'Position', [360, 170, 400, 200]);
 
@@ -397,6 +403,13 @@ add_line(wd, 'Impact_Switch/1', 'M_with_Impact/2');
 add_line(wd, 'M_with_Impact/1', 'OmegaDot_Num/1');
 add_line(wd, 'Domega_Product/1', 'OmegaDot_Num/2');
 add_line(wd, 'Ktheta_Gain/1', 'OmegaDot_Num/3');
+
+% J̇·ω 连线：α(t) → dα/dt → dJ/dt → J̇·ω → OmegaDot_Num
+add_line(wd, 'Ratio_Sat/1', 'Jdot_Deriv/1');
+add_line(wd, 'Jdot_Deriv/1', 'Jdot_Gain/1');
+add_line(wd, 'Jdot_Gain/1', 'Jdot_Omega_Product/1');
+add_line(wd, 'Omega_Int/1', 'Jdot_Omega_Product/2');
+add_line(wd, 'Jdot_Omega_Product/1', 'OmegaDot_Num/4');
 
 add_line(wd, 'OmegaDot_Num/1', 'Divide_J/1');
 add_line(wd, 'J_t_Sum/1', 'Divide_J/2');
