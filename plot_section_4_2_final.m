@@ -72,13 +72,13 @@ theta_ref_val = evalin('base', 'theta_ref');
 t_enter_val = evalin('base', 't_enter');
 
 % 学术配色方案
-color_scheme1 = [0.85, 0.33, 0.10];  % IEEE Red - Fixed PID
-color_scheme2 = [0.00, 0.45, 0.74];  % IEEE Blue - Fixed PID + Observer
-color_scheme3 = [0.20, 0.70, 0.20];  % IEEE Green - Variable PID + Observer
+color_scheme1 = [0.85, 0.33, 0.10];  % IEEE Red - 固定 PID
+color_scheme2 = [0.00, 0.45, 0.74];  % IEEE Blue - 固定 PID + 扰动观测器
+color_scheme3 = [0.20, 0.70, 0.20];  % IEEE Green - 变参数 PID + 扰动观测器
 
 %% ===== 测试1: 固定PID =====
 
-fprintf('\n  测试1: Fixed PID...\n');
+fprintf('\n  测试1: 固定 PID...\n');
 assignin('base', 'a_omega', 0);
 assignin('base', 'b_omega', 0);
 assignin('base', 'c_theta', 0);
@@ -104,14 +104,14 @@ try
         end
     end
 
-    fprintf('    ✓ Simulation completed\n');
+    fprintf('    ✓ 仿真完成\n');
 catch ME
-    fprintf('    ✗ Simulation failed: %s\n', ME.message);
+    fprintf('    ✗ 仿真失败: %s\n', ME.message);
 end
 
 %% ===== 测试2: 固定PID + 扰动观测器 =====
 
-fprintf('  测试2: Fixed PID + Observer...\n');
+fprintf('  测试2: 固定 PID + 扰动观测器...\n');
 assignin('base', 'a_omega', 550);
 assignin('base', 'b_omega', 4);
 assignin('base', 'c_theta', 4);
@@ -137,14 +137,14 @@ try
         end
     end
 
-    fprintf('    ✓ Simulation completed\n');
+    fprintf('    ✓ 仿真完成\n');
 catch ME
-    fprintf('    ✗ Simulation failed: %s\n', ME.message);
+    fprintf('    ✗ 仿真失败: %s\n', ME.message);
 end
 
 %% ===== 测试3: 变参数PID + 扰动观测器 =====
 
-fprintf('  测试3: Variable PID + Observer (Proposed)...\n');
+fprintf('  测试3: 变参数 PID + 扰动观测器（本文方法）...\n');
 assignin('base', 'a_omega', 550);
 assignin('base', 'b_omega', 4);
 assignin('base', 'c_theta', 4);
@@ -170,9 +170,9 @@ try
         end
     end
 
-    fprintf('    ✓ Simulation completed\n');
+    fprintf('    ✓ 仿真完成\n');
 catch ME
-    fprintf('    ✗ Simulation failed: %s\n', ME.message);
+    fprintf('    ✗ 仿真失败: %s\n', ME.message);
 end
 
 %% ===== 步骤4：计算性能指标 =====
@@ -221,18 +221,20 @@ energy_fixed = trapz(results.t_fixed, abs(results.Mpid_fixed));
 energy_ab = trapz(results.t_ab, abs(results.Mpid_ab));
 energy_abc = trapz(results.t_abc, abs(results.Mpid_abc));
 
-fprintf('  Scheme 1: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
+fprintf('  方案1: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
     metrics_fixed.Mp, metrics_fixed.Ts, metrics_fixed.ess);
-fprintf('  Scheme 2: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
+fprintf('  方案2: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
     metrics_ab.Mp, metrics_ab.Ts, metrics_ab.ess);
-fprintf('  Scheme 3: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
+fprintf('  方案3: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
     metrics_abc.Mp, metrics_abc.Ts, metrics_abc.ess);
 
 %% ========== 图表5：多方案姿态对比 + 局部放大（4.2.2）==========
 
-fprintf('\n生成图表5: Multi-Scheme Attitude Comparison\n');
+fprintf('\n生成图表5: 多方案姿态对比\n');
 
 figure5 = figure('Position', [100, 100, 900, 700]);
+set(figure5, 'DefaultAxesFontName', 'SimSun');
+set(figure5, 'DefaultTextFontName', 'SimSun');
 
 % 主图
 plot(results.t_fixed, results.theta_fixed, '-', 'Color', color_scheme1, 'LineWidth', 1.8);
@@ -242,18 +244,19 @@ plot(results.t_abc, results.theta_abc, '-', 'Color', color_scheme3, 'LineWidth',
 yline(theta_ref_val, '--', 'Color', [0.50, 0.50, 0.50], 'LineWidth', 1.5);
 
 xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
-    'Label', 'Water Entry', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
+    'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top', 'FontName', 'SimSun');
 
 grid on;
-set(gca, 'FontSize', 12);
-xlabel('Time (s)', 'FontSize', 14, 'FontWeight', 'bold');
-ylabel('Attitude Angle \theta (rad)', 'FontSize', 14, 'FontWeight', 'bold');
-title('Multi-Scheme Attitude Response Comparison', 'FontSize', 16, 'FontWeight', 'bold');
-legend({'Fixed PID', 'Fixed PID + Observer', 'Variable PID + Observer (Proposed)', 'Reference'}, ...
-    'Location', 'best', 'FontSize', 11, 'Box', 'on');
+set(gca, 'FontSize', 12, 'FontName', 'SimSun');
+xlabel('时间 (s)', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'SimSun');
+ylabel('姿态角 θ (rad)', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('多方案姿态响应对比', 'FontSize', 16, 'FontWeight', 'bold', 'FontName', 'SimSun');
+legend({'固定 PID', '固定 PID + 扰动观测器', '变参数 PID + 扰动观测器（本文方法）', '参考值'}, ...
+    'Location', 'best', 'FontSize', 11, 'Box', 'on', 'FontName', 'SimSun');
 
 % 嵌入子图：放大入水瞬间
 h_inset = axes('Position', [0.6, 0.6, 0.28, 0.28]);
+set(h_inset, 'FontName', 'SimSun');
 idx_fixed = find(results.t_fixed >= 1.8 & results.t_fixed <= 2.5);
 idx_ab = find(results.t_ab >= 1.8 & results.t_ab <= 2.5);
 idx_abc = find(results.t_abc >= 1.8 & results.t_abc <= 2.5);
@@ -263,38 +266,39 @@ hold on;
 plot(results.t_ab(idx_ab), results.theta_ab(idx_ab), '--', 'Color', color_scheme2, 'LineWidth', 2.5);
 plot(results.t_abc(idx_abc), results.theta_abc(idx_abc), '-', 'Color', color_scheme3, 'LineWidth', 3);
 yline(theta_ref_val, '--', 'Color', [0.50, 0.50, 0.50], 'LineWidth', 1.5);
-xline(t_enter_val, '-', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, 'FontSize', 10, 'FontWeight', 'bold');
+xline(t_enter_val, '-', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
+    'Label', '入水时刻', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top', 'FontName', 'SimSun');
 xlim([1.8, 2.5]);
 grid on;
-xlabel('Time (s)', 'FontSize', 10);
-ylabel('\theta (rad)', 'FontSize', 10);
-title('Zoomed: Water Entry', 'FontSize', 11, 'FontWeight', 'bold');
-set(h_inset, 'FontSize', 9);
+xlabel('时间 (s)', 'FontSize', 10, 'FontName', 'SimSun');
+ylabel('姿态角 θ (rad)', 'FontSize', 10, 'FontName', 'SimSun');
+title('局部放大：入水瞬间', 'FontSize', 11, 'FontWeight', 'bold', 'FontName', 'SimSun');
+set(h_inset, 'FontSize', 9, 'FontName', 'SimSun');
 box on;
 
 saveas(figure5, 'figure4_5_multi_scheme_comparison.png');
 saveas(figure5, 'figure4_5_multi_scheme_comparison.eps');
-fprintf('  ✓ Figure 5 saved\n');
+fprintf('  ✓ 图表5已保存\n');
 % 
 % %% ========== 图表6：抗扰动能力对比（4.2.3）==========
-% 
-% fprintf('\n生成图表6: Disturbance Rejection Comparison\n');
-% 
+%
+% fprintf('\n生成图表6: 抗扰动能力对比\n');
+%
 % A_impact_list = [0, 150, 300, 450];
 % theta_disturb = zeros(1001, 3, 4);
 % t_disturb = zeros(1001, 4);
-% 
+%
 % for i = 1:4
-%     fprintf('  Testing A_impact=%d...\n', A_impact_list(i));
-% 
+%     fprintf('  测试 A_impact=%d...\n', A_impact_list(i));
+%
 %     assignin('base', 'A_impact', A_impact_list(i));
-% 
+%
 %     % 方案1: 固定PID
 %     assignin('base', 'a_omega', 0);
 %     assignin('base', 'b_omega', 0);
 %     assignin('base', 'c_theta', 0);
 %     assignin('base', 'tau_eso', 1000);
-% 
+%
 %     try
 %         simOut_d = sim(model, 'SaveOutput', 'on', 'SaveTime', 'on');
 %         if isprop(simOut_d, 'theta_sim')
@@ -306,10 +310,10 @@ fprintf('  ✓ Figure 5 saved\n');
 %         end
 %     catch
 %     end
-% 
+%
 %     % 方案2: 固定PID + 观测器
 %     assignin('base', 'tau_eso', 0.01);
-% 
+%
 %     try
 %         simOut_d = sim(model, 'SaveOutput', 'on', 'SaveTime', 'on');
 %         if isprop(simOut_d, 'theta_sim')
@@ -320,12 +324,12 @@ fprintf('  ✓ Figure 5 saved\n');
 %         end
 %     catch
 %     end
-% 
+%
 %     % 方案3: 变参数PID + 观测器
 %     assignin('base', 'a_omega', 8);
 %     assignin('base', 'b_omega', 1.5);
 %     assignin('base', 'c_theta', 2);
-% 
+%
 %     try
 %         simOut_d = sim(model, 'SaveOutput', 'on', 'SaveTime', 'on');
 %         if isprop(simOut_d, 'theta_sim')
@@ -337,71 +341,78 @@ fprintf('  ✓ Figure 5 saved\n');
 %     catch
 %     end
 % end
-% 
+%
 % % 绘制分面网格图
 % figure6 = figure('Position', [100, 100, 1200, 900]);
-% 
-% labels = {'Fixed PID', 'Fixed PID+Observer', 'Variable PID+Observer'};
-% 
+% set(figure6, 'DefaultAxesFontName', 'SimSun');
+% set(figure6, 'DefaultTextFontName', 'SimSun');
+%
+% labels = {'固定 PID', '固定 PID + 扰动观测器', '变参数 PID + 扰动观测器'};
+%
 % for i = 1:4
 %     subplot(2, 2, i);
-% 
+%
 %     plot(t_disturb(:,i), theta_disturb(:,1,i), '-', 'Color', color_scheme1, 'LineWidth', 2);
 %     hold on;
 %     plot(t_disturb(:,i), theta_disturb(:,2,i), '--', 'Color', color_scheme2, 'LineWidth', 2);
 %     plot(t_disturb(:,i), theta_disturb(:,3,i), '-', 'Color', color_scheme3, 'LineWidth', 2.5);
-% 
+%
 %     yline(theta_ref_val, '--', 'Color', [0.50, 0.50, 0.50], 'LineWidth', 1.5);
-%     xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5);
-% 
+%     xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
+%         'Label', '入水时刻', 'FontName', 'SimSun');
+%
 %     grid on;
-%     set(gca, 'FontSize', 11);
-%     xlabel('Time (s)', 'FontSize', 12);
-%     ylabel('\theta (rad)', 'FontSize', 12);
-%     title(sprintf('Disturbance A_{impact}=%d', A_impact_list(i)), 'FontSize', 13, 'FontWeight', 'bold');
-%     legend(labels, 'Location', 'best', 'FontSize', 10);
+%     set(gca, 'FontSize', 11, 'FontName', 'SimSun');
+%     xlabel('时间 (s)', 'FontSize', 12, 'FontName', 'SimSun');
+%     ylabel('姿态角 θ (rad)', 'FontSize', 12, 'FontName', 'SimSun');
+%     title(sprintf('扰动强度 A_{impact}=%d', A_impact_list(i)), 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+%     legend(labels, 'Location', 'best', 'FontSize', 10, 'FontName', 'SimSun');
 % end
-% 
-% sgtitle('Performance Comparison under Different Disturbance Intensities', 'FontSize', 16, 'FontWeight', 'bold');
-% 
+%
+% sgtitle('不同扰动强度下的性能对比', 'FontSize', 16, 'FontWeight', 'bold', 'FontName', 'SimSun');
+%
 % saveas(figure6, 'figure4_6_disturbance_rejection.png');
 % saveas(figure6, 'figure4_6_disturbance_rejection.eps');
-% fprintf('  ✓ Figure 6 saved\n');
-% 
+% fprintf('  ✓ 图表6已保存\n');
+%
 % %% ========== 图表7：综合性能雷达图（4.2.4）==========
-% 
-% fprintf('\n生成图表7: Comprehensive Performance Radar Chart\n');
-% 
+%
+% fprintf('\n生成图表7: 综合性能雷达图\n');
+%
 % figure7 = figure('Position', [100, 100, 800, 800]);
-% 
+% set(figure7, 'DefaultAxesFontName', 'SimSun');
+% set(figure7, 'DefaultTextFontName', 'SimSun');
+%
 % % 计算5个维度的归一化指标
 % metrics_matrix = [
 %     1/metrics_fixed.Mp,  1/metrics_fixed.Ts,  1/metrics_fixed.ess,  1/energy_fixed,  0.8;
 %     1/metrics_ab.Mp,     1/metrics_ab.Ts,     1/metrics_ab.ess,     1/energy_ab,     0.9;
 %     1/metrics_abc.Mp,    1/metrics_abc.Ts,    1/metrics_abc.ess,    1/energy_abc,    1.0;
 % ];
-% 
+%
 % % 归一化到 [0, 1]
 % metrics_norm = zeros(size(metrics_matrix));
 % for i = 1:size(metrics_matrix, 2)
 %     max_val = max(metrics_matrix(:, i));
 %     metrics_norm(:, i) = metrics_matrix(:, i) / max_val;
 % end
-% 
+%
 % % 雷达图标签
-% labels = {'Tracking Accuracy', 'Response Speed', 'Anti-Impact', 'Energy Efficiency', 'Robustness'};
+% labels = {'跟踪精度', '响应速度', '抗冲击能力', '能量效率', '鲁棒性'};
 % num_vars = length(labels);
 % angles = linspace(0, 2*pi, num_vars+1);
-% 
+%
 % % 创建极坐标轴
 % ax = polaraxes('Parent', figure7);
 % hold(ax, 'on');
-% 
+% ax.FontName = 'SimSun';
+% ax.FontSize = 11;
+%
 % % 绘制雷达图
 % colors = {color_scheme1, color_scheme2, color_scheme3};
 % line_styles = {'--', '--', '-'};
 % line_widths = [1.5, 1.5, 2.5];
-% 
+%
 % for i = 1:3
 %     values = [metrics_norm(i, :), metrics_norm(i, 1)];
 %     polarplot(ax, angles, values, 'Color', colors{i}, ...
@@ -410,55 +421,57 @@ fprintf('  ✓ Figure 5 saved\n');
 %         'Marker', 'o', ...
 %         'MarkerSize', 6);
 % end
-% 
+%
 % % 设置雷达图样式
 % ax.ThetaTick = rad2deg(angles(1:end-1));
 % ax.ThetaTickLabel = labels;
 % ax.RLim = [0, 1.1];
 % ax.RTick = [0.2, 0.4, 0.6, 0.8, 1.0];
-% 
-% title(ax, 'Comprehensive Performance Radar Chart', 'FontSize', 16, 'FontWeight', 'bold');
-% legend(ax, {'Fixed PID', 'Fixed PID+Observer', 'Variable PID+Observer (Proposed)'}, ...
-%     'Location', 'best', 'FontSize', 11);
-% 
+%
+% title(ax, '综合性能雷达图', 'FontSize', 16, 'FontWeight', 'bold', 'FontName', 'SimSun');
+% legend(ax, {'固定 PID', '固定 PID + 扰动观测器', '变参数 PID + 扰动观测器（本文方法）'}, ...
+%     'Location', 'best', 'FontSize', 11, 'FontName', 'SimSun');
+%
 % grid(ax, 'on');
-% 
+%
 % saveas(figure7, 'figure4_7_performance_radar.png');
 % saveas(figure7, 'figure4_7_performance_radar.eps');
-% fprintf('  ✓ Figure 7 saved\n');
-% 
+% fprintf('  ✓ 图表7已保存\n');
+%
 % %% ========== 图表8：定量指标对比柱状图（4.2.4）==========
-% 
-% fprintf('\n生成图表8: Quantitative Performance Metrics\n');
-% 
+%
+% fprintf('\n生成图表8: 定量性能指标对比\n');
+%
 % figure8 = figure('Position', [100, 100, 900, 600]);
-% 
+% set(figure8, 'DefaultAxesFontName', 'SimSun');
+% set(figure8, 'DefaultTextFontName', 'SimSun');
+%
 % % 性能指标数据
-% metric_names = {'Settling Time Ts (s)', 'Overshoot Mp (%)', 'Steady Error ess (10^{-3} rad)'};
+% metric_names = {'调节时间 Ts (s)', '超调量 Mp (%)', '稳态误差 ess (10^{-3} rad)'};
 % metrics_data = [
 %     metrics_fixed.Ts,  metrics_fixed.Mp,  metrics_fixed.ess*1000;
 %     metrics_ab.Ts,     metrics_ab.Mp,     metrics_ab.ess*1000;
 %     metrics_abc.Ts,    metrics_abc.Mp,    metrics_abc.ess*1000;
 % ];
-% 
+%
 % % 归一化（方案1设为1）
 % metrics_norm = metrics_data ./ metrics_data(1, :);
-% 
+%
 % % 绘制分组柱状图
 % x = 1:3;
-% 
+%
 % bar_data = zeros(3, 3);
 % for i = 1:3
 %     for j = 1:3
 %         bar_data(i, j) = metrics_norm(j, i);
 %     end
 % end
-% 
+%
 % b = bar(x, bar_data');
 % b(1).FaceColor = color_scheme1;
 % b(2).FaceColor = color_scheme2;
 % b(3).FaceColor = color_scheme3;
-% 
+%
 % % 添加改善百分比标注
 % hold on;
 % for i = 1:3
@@ -466,35 +479,35 @@ fprintf('  ✓ Figure 5 saved\n');
 %     text(i, bar_data(3, i) + 0.05, sprintf('↓%.1f%%', improvement), ...
 %         'HorizontalAlignment', 'center', ...
 %         'FontSize', 11, 'FontWeight', 'bold', ...
-%         'Color', color_scheme3);
+%         'Color', color_scheme3, 'FontName', 'SimSun');
 % end
-% 
+%
 % grid on;
-% set(gca, 'XTickLabel', metric_names, 'FontSize', 12);
-% ylabel('Normalized Value (Scheme 1=1)', 'FontSize', 13, 'FontWeight', 'bold');
-% title('Quantitative Performance Metrics Comparison', 'FontSize', 15, 'FontWeight', 'bold');
-% legend({'Fixed PID', 'Fixed PID+Observer', 'Variable PID+Observer (Proposed)'}, ...
-%     'Location', 'best', 'FontSize', 11, 'Box', 'on');
+% set(gca, 'XTickLabel', metric_names, 'FontSize', 12, 'FontName', 'SimSun');
+% ylabel('归一化数值（方案1=1）', 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+% title('定量性能指标对比', 'FontSize', 15, 'FontWeight', 'bold', 'FontName', 'SimSun');
+% legend({'固定 PID', '固定 PID + 扰动观测器', '变参数 PID + 扰动观测器（本文方法）'}, ...
+%     'Location', 'best', 'FontSize', 11, 'Box', 'on', 'FontName', 'SimSun');
 % ylim([0, 1.5]);
-% 
+%
 % saveas(figure8, 'figure4_8_performance_metrics.png');
 % saveas(figure8, 'figure4_8_performance_metrics.eps');
-% fprintf('  ✓ Figure 8 saved\n');
-% 
+% fprintf('  ✓ 图表8已保存\n');
+%
 % %% ===== 保存数据 =====
-% 
+%
 % fprintf('\n保存数据\n');
-% 
+%
 % save('section_4_2_data.mat', ...
 %     'results', 'metrics_fixed', 'metrics_ab', 'metrics_abc', ...
 %     'theta_disturb', 't_disturb', 'A_impact_list', ...
 %     'energy_fixed', 'energy_ab', 'energy_abc');
-% 
-% fprintf('  ✓ Data saved\n');
-% 
+%
+% fprintf('  ✓ 数据已保存\n');
+%
 % fprintf('\n=== 4.2节所有图表生成完成 ===\n');
 % fprintf('\n生成的图表：\n');
-% fprintf('  Figure 5: figure4_5_multi_scheme_comparison.png/eps (4.2.2 Multi-Scheme Comparison)\n');
-% fprintf('  Figure 6: figure4_6_disturbance_rejection.png/eps (4.2.3 Disturbance Rejection)\n');
-% fprintf('  Figure 7: figure4_7_performance_radar.png/eps (4.2.4 Performance Radar)\n');
-% fprintf('  Figure 8: figure4_8_performance_metrics.png/eps (4.2.4 Quantitative Metrics)\n');
+% fprintf('  图表5: figure4_5_multi_scheme_comparison.png/eps (4.2.2 多方案对比)\n');
+% fprintf('  图表6: figure4_6_disturbance_rejection.png/eps (4.2.3 抗扰动能力)\n');
+% fprintf('  图表7: figure4_7_performance_radar.png/eps (4.2.4 综合性能雷达图)\n');
+% fprintf('  图表8: figure4_8_performance_metrics.png/eps (4.2.4 定量指标对比)\n');

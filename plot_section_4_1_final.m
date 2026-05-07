@@ -134,6 +134,8 @@ fprintf('  超调量: %.2f%%, 调节时间: %.3fs, 稳态误差: %.5f rad\n', Mp
 fprintf('\n生成图表1: 姿态角时域响应曲线\n');
 
 figure1 = figure('Position', [100, 100, 800, 600]);
+set(figure1, 'DefaultAxesFontName', 'SimSun');
+set(figure1, 'DefaultTextFontName', 'SimSun');
 
 color_response = [0.00, 0.45, 0.74];
 color_ref = [0.85, 0.33, 0.10];
@@ -148,31 +150,32 @@ yline(theta_ref_val + band, ':', 'Color', color_band, 'LineWidth', 1.2, 'HandleV
 yline(theta_ref_val - band, ':', 'Color', color_band, 'LineWidth', 1.2, 'HandleVisibility', 'off');
 
 xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
-    'Label', 'Water Entry', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'bottom');
+    'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
 
 plot(t(idx_max), theta_max, 'o', 'MarkerSize', 12, ...
     'MarkerFaceColor', color_peak, 'MarkerEdgeColor', 'k', 'LineWidth', 1.5);
 
 text(t(idx_max)*1.02, theta_max + 0.03, ...
-    sprintf('Mp = %.1f%%', Mp), ...
-    'FontSize', 12, 'FontWeight', 'bold', 'Color', color_peak);
+    sprintf('超调量 = %.1f%%', Mp), ...
+    'FontSize', 12, 'FontWeight', 'bold', 'Color', color_peak, 'FontName', 'SimSun');
 
 if ~isnan(Ts)
     xline(Ts, '-', 'Color', [0.30, 0.30, 0.30], 'LineWidth', 2, ...
-        'Label', sprintf('Ts = %.2fs', Ts), 'FontSize', 10, 'FontWeight', 'bold', ...
-        'LabelVerticalAlignment', 'bottom');
+        'Label', sprintf('调节时间 = %.2fs', Ts), 'FontSize', 10, 'FontWeight', 'bold', ...
+        'LabelVerticalAlignment', 'top');
 end
 
 grid on;
-set(gca, 'FontSize', 12);
-xlabel('Time (s)', 'FontSize', 14, 'FontWeight', 'bold');
-ylabel('Attitude Angle \theta (rad)', 'FontSize', 14, 'FontWeight', 'bold');
-title('Attitude Angle Response', 'FontSize', 16, 'FontWeight', 'bold');
+set(gca, 'FontSize', 12, 'FontName', 'SimSun');
+xlabel('时间 (s)', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'SimSun');
+ylabel('姿态角 θ (rad)', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('姿态角响应曲线', 'FontSize', 16, 'FontWeight', 'bold', 'FontName', 'SimSun');
 
-legend({'Response', 'Reference', 'Peak Point'}, ...
-    'Location', 'best', 'FontSize', 12, 'Box', 'on');
+legend({'响应曲线', '参考值', '峰值点'}, ...
+    'Location', 'best', 'FontSize', 12, 'Box', 'on', 'FontName', 'SimSun');
 
 h_inset = axes('Position', [0.55, 0.2, 0.32, 0.25]);
+set(h_inset, 'FontName', 'SimSun');
 idx_steady = find(t >= 8 & t <= 10);
 plot(t(idx_steady), data.theta(idx_steady), '-', 'Color', color_response, 'LineWidth', 2.5);
 hold on;
@@ -180,21 +183,50 @@ yline(theta_ref_val, '--', 'Color', color_ref, 'LineWidth', 1.5);
 yline(theta_ref_val + band, ':', 'Color', color_band, 'LineWidth', 1.2);
 yline(theta_ref_val - band, ':', 'Color', color_band, 'LineWidth', 1.2);
 grid on;
-xlabel('Time (s)', 'FontSize', 11);
-ylabel('\theta (rad)', 'FontSize', 11);
-title('Steady-State Error', 'FontSize', 12, 'FontWeight', 'bold');
-set(h_inset, 'FontSize', 10);
+xlabel('时间 (s)', 'FontSize', 11, 'FontName', 'SimSun');
+ylabel('姿态角 θ (rad)', 'FontSize', 11, 'FontName', 'SimSun');
+title('稳态误差放大', 'FontSize', 12, 'FontWeight', 'bold', 'FontName', 'SimSun');
+set(h_inset, 'FontSize', 10, 'FontName', 'SimSun');
 box on;
 
 saveas(figure1, 'figure4_1_theta_response.png');
 saveas(figure1, 'figure4_1_theta_response.eps');
 fprintf('  ✓ 图表1已保存\n');
 
-%% ========== 图表2：PID参数时变曲线（4.1.3 - 三子图）==========
+%% ========== 图表2A：角速度响应曲线（4.1.3）==========
 
-fprintf('\n生成图表2: PID参数时变曲线（三子图）\n');
+fprintf('\n生成图表2A: 角速度响应曲线\n');
 
-figure2 = figure('Position', [100, 100, 900, 700]);
+figure2a = figure('Position', [100, 100, 800, 500]);
+set(figure2a, 'DefaultAxesFontName', 'SimSun');
+set(figure2a, 'DefaultTextFontName', 'SimSun');
+
+color_omega = [0.00, 0.45, 0.74];
+
+plot(t, data.omega, '-', 'Color', color_omega, 'LineWidth', 2.2);
+hold on;
+yline(0, '--', 'Color', [0.50, 0.50, 0.50], 'LineWidth', 1.2);
+xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
+    'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
+
+grid on;
+set(gca, 'FontSize', 12, 'FontName', 'SimSun');
+xlabel('时间 (s)', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'SimSun');
+ylabel('角速度 ω (rad/s)', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('角速度响应曲线', 'FontSize', 16, 'FontWeight', 'bold', 'FontName', 'SimSun');
+legend({'角速度响应', '零参考线'}, 'Location', 'best', 'FontSize', 12, 'Box', 'on', 'FontName', 'SimSun');
+
+saveas(figure2a, 'figure4_2a_omega_response.png');
+saveas(figure2a, 'figure4_2a_omega_response.eps');
+fprintf('  ✓ 图表2A已保存\n');
+
+%% ========== 图表2B：PID参数时变曲线（4.1.3 - 三子图）==========
+
+fprintf('\n生成图表2B: PID参数时变曲线（三子图）\n');
+
+figure2b = figure('Position', [100, 100, 900, 700]);
+set(figure2b, 'DefaultAxesFontName', 'SimSun');
+set(figure2b, 'DefaultTextFontName', 'SimSun');
 
 color_Kp = [0.85, 0.33, 0.10];
 color_Kd = [0.47, 0.67, 0.19];
@@ -215,47 +247,49 @@ subplot(3, 1, 1);
 plot(t, Kp_t, '-', 'Color', color_Kp, 'LineWidth', 1.2);
 hold on;
 xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
-    'Label', 'Water Entry', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'bottom');
+    'Label', '入水时刻', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
 grid on;
-set(gca, 'FontSize', 11);
-ylabel('K_p(t)', 'FontSize', 13, 'FontWeight', 'bold');
-title('Proportional Gain Variation', 'FontSize', 13, 'FontWeight', 'bold');
-legend({'K_p(t) = K_{p0} + a|\omega|'}, 'Location', 'best', 'FontSize', 10);
+set(gca, 'FontSize', 11, 'FontName', 'SimSun');
+ylabel('Kp(t)', 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('比例增益变化', 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+legend({'Kp(t) = Kp0 + a|ω|'}, 'Location', 'best', 'FontSize', 10, 'FontName', 'SimSun');
 
 subplot(3, 1, 2);
 plot(t, Kd_t, '-', 'Color', color_Kd, 'LineWidth', 1.2);
 hold on;
 xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
-    'Label', 'Water Entry', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'bottom');
+    'Label', '入水时刻', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
 grid on;
-set(gca, 'FontSize', 11);
-ylabel('K_d(t)', 'FontSize', 13, 'FontWeight', 'bold');
-title('Derivative Gain Variation', 'FontSize', 13, 'FontWeight', 'bold');
-legend({'K_d(t) = K_{d0} + b|\omega|'}, 'Location', 'best', 'FontSize', 10);
+set(gca, 'FontSize', 11, 'FontName', 'SimSun');
+ylabel('Kd(t)', 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('微分增益变化', 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+legend({'Kd(t) = Kd0 + b|ω|'}, 'Location', 'best', 'FontSize', 10, 'FontName', 'SimSun');
 
 subplot(3, 1, 3);
 plot(t, Ki_t, '-', 'Color', color_Ki, 'LineWidth', 1.2);
 hold on;
 xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
-    'Label', 'Water Entry', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'bottom');
+    'Label', '入水时刻', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
 grid on;
-set(gca, 'FontSize', 11);
-xlabel('Time (s)', 'FontSize', 13, 'FontWeight', 'bold');
-ylabel('K_i(t)', 'FontSize', 13, 'FontWeight', 'bold');
-title('Integral Gain Variation', 'FontSize', 13, 'FontWeight', 'bold');
-legend({'K_i(t) = K_{i0} e^{-c|\theta|}'}, 'Location', 'best', 'FontSize', 10);
+set(gca, 'FontSize', 11, 'FontName', 'SimSun');
+xlabel('时间 (s)', 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+ylabel('Ki(t)', 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('积分增益变化', 'FontSize', 13, 'FontWeight', 'bold', 'FontName', 'SimSun');
+legend({'Ki(t) = Ki0·exp(-c|θ|)'}, 'Location', 'best', 'FontSize', 10, 'FontName', 'SimSun');
 
-sgtitle('Adaptive PID Parameters Variation', 'FontSize', 16, 'FontWeight', 'bold');
+sgtitle('自适应PID参数变化', 'FontSize', 16, 'FontWeight', 'bold', 'FontName', 'SimSun');
 
-saveas(figure2, 'figure4_2_pid_params.png');
-saveas(figure2, 'figure4_2_pid_params.eps');
-fprintf('  ✓ 图表2已保存\n');
+saveas(figure2b, 'figure4_2b_pid_params.png');
+saveas(figure2b, 'figure4_2b_pid_params.eps');
+fprintf('  ✓ 图表2B已保存\n');
 
 %% ========== 图表3：控制力矩组成分析（4.1.4）==========
 
 fprintf('\n生成图表3: 控制力矩组成分析\n');
 
 figure3 = figure('Position', [100, 100, 800, 600]);
+set(figure3, 'DefaultAxesFontName', 'SimSun');
+set(figure3, 'DefaultTextFontName', 'SimSun');
 
 M_total = data.M_pid + data.d_hat;
 
@@ -274,25 +308,26 @@ plot(t, M_total, '-', 'Color', color_total, 'LineWidth', 2.5);
 plot(t, data.M_pid, '--', 'Color', [0.15, 0.45, 0.75], 'LineWidth', 2);
 
 xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
-    'Label', 'Water Entry', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'bottom');
+    'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'bottom');
 
 [~, idx_impact] = max(abs(M_total));
 text(t(idx_impact), M_total(idx_impact) + 40, ...
-    sprintf('Peak: %.1f Nm', M_total(idx_impact)), ...
-    'FontSize', 12, 'FontWeight', 'bold', 'BackgroundColor', 'white');
+    sprintf('峰值: %.1f N·m', M_total(idx_impact)), ...
+    'FontSize', 12, 'FontWeight', 'bold', 'BackgroundColor', 'white', 'FontName', 'SimSun');
 
 grid on;
-set(gca, 'FontSize', 12);
-xlabel('Time (s)', 'FontSize', 14, 'FontWeight', 'bold');
-ylabel('Control Torque (Nm)', 'FontSize', 14, 'FontWeight', 'bold');
-title('Control Torque Composition: PID + Disturbance Compensation', 'FontSize', 16, 'FontWeight', 'bold');
+set(gca, 'FontSize', 12, 'FontName', 'SimSun');
+xlabel('时间 (s)', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'SimSun');
+ylabel('控制力矩 (N·m)', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('控制力矩组成：PID控制 + 扰动补偿', 'FontSize', 16, 'FontWeight', 'bold', 'FontName', 'SimSun');
 
-legend({'M_{PID} (PID Control)', 'Disturbance Compensation', ...
-        'M_{total} (Total Torque)', 'M_{PID} Boundary', 'Water Entry'}, ...
-    'Location', 'best', 'FontSize', 11, 'Box', 'on');
+legend({'PID控制力矩', '扰动补偿', ...
+        '总力矩', 'PID力矩边界', '入水时刻'}, ...
+    'Location', 'best', 'FontSize', 11, 'Box', 'on', 'FontName', 'SimSun');
 
 % 添加嵌入子图：放大1.5-2.5s
 h_inset = axes('Position', [0.55, 0.2, 0.32, 0.28]);
+set(h_inset, 'FontName', 'SimSun');
 idx_zoom = find(t >= 1.5 & t <= 2.5);
 
 fill([t(idx_zoom); flipud(t(idx_zoom))], ...
@@ -310,10 +345,10 @@ plot(t(idx_zoom), data.M_pid(idx_zoom), '--', 'Color', [0.15, 0.45, 0.75], 'Line
 xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5);
 
 grid on;
-xlabel('Time (s)', 'FontSize', 10);
-ylabel('Torque (Nm)', 'FontSize', 10);
-title('Zoomed: 1.5-2.5s', 'FontSize', 11, 'FontWeight', 'bold');
-set(h_inset, 'FontSize', 9);
+xlabel('时间 (s)', 'FontSize', 10, 'FontName', 'SimSun');
+ylabel('力矩 (N·m)', 'FontSize', 10, 'FontName', 'SimSun');
+title('局部放大：1.5-2.5 s', 'FontSize', 11, 'FontWeight', 'bold', 'FontName', 'SimSun');
+set(h_inset, 'FontSize', 9, 'FontName', 'SimSun');
 xlim([1.5, 2.5]);
 box on;
 
@@ -344,5 +379,6 @@ fprintf('  ✓ 数据已保存\n');
 fprintf('\n=== 4.1节所有图表生成完成 ===\n');
 fprintf('\n生成的图表：\n');
 fprintf('  图表1: figure4_1_theta_response.png/eps (4.1.2 姿态角响应)\n');
-fprintf('  图表2: figure4_2_pid_params.png/eps (4.1.3 PID参数变化-三子图)\n');
+fprintf('  图表2A: figure4_2a_omega_response.png/eps (4.1.3 角速度响应)\n');
+fprintf('  图表2B: figure4_2b_pid_params.png/eps (4.1.3 PID参数变化-三子图)\n');
 fprintf('  图表3: figure4_3_control_torque.png/eps (4.1.4 控制力矩组成)\n');
