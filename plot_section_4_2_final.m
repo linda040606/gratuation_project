@@ -69,7 +69,8 @@ fprintf('\n步骤3: 运行多方案仿真\n');
 
 results = struct();
 theta_ref_val = evalin('base', 'theta_ref');
-t_enter_val = evalin('base', 't_enter');
+t_fold_start_val = evalin('base', 't_fold_start');
+t_water_enter_val = evalin('base', 't_water_enter');
 
 % 学术配色方案
 color_scheme1 = [0.85, 0.33, 0.10];  % IEEE Red - 固定 PID
@@ -112,10 +113,10 @@ end
 %% ===== 测试2: 固定PID + 扰动观测器 =====
 
 fprintf('  测试2: 固定 PID + 扰动观测器...\n');
-assignin('base', 'a_omega', 550);
-assignin('base', 'b_omega', 4);
-assignin('base', 'c_theta', 4);
-assignin('base', 'tau_eso', 1000);  % 启用观测器
+assignin('base', 'a_omega', 0);
+assignin('base', 'b_omega', 0);
+assignin('base', 'c_theta', 0);
+assignin('base', 'tau_eso', 0.01);  % 启用观测器
 
 try
     simOut_ab = sim(model, 'SaveOutput', 'on', 'SaveTime', 'on');
@@ -179,41 +180,122 @@ end
 
 fprintf('\n步骤4: 计算性能指标\n');
 
+% 关键时刻
+idx_track_end_fixed = find(results.t_fixed <= t_fold_start_val, 1, 'last');
+idx_track_end_ab = find(results.t_ab <= t_fold_start_val, 1, 'last');
+idx_track_end_abc = find(results.t_abc <= t_fold_start_val, 1, 'last');
+
+[~, idx_enter_fixed] = min(abs(results.t_fixed - t_water_enter_val));
+[~, idx_enter_ab] = min(abs(results.t_ab - t_water_enter_val));
+[~, idx_enter_abc] = min(abs(results.t_abc - t_water_enter_val));
+
 % 方案1指标
 metrics_fixed = struct();
 metrics_fixed.Mp = (max(results.theta_fixed) - theta_ref_val) / abs(theta_ref_val) * 100;
 metrics_fixed.ess = abs(results.theta_fixed(end) - theta_ref_val);
 band = 0.02 * abs(theta_ref_val);
-metrics_fixed.Ts = NaN;
-for i = 1:length(results.t_fixed)
-    if all(abs(results.theta_fixed(i:end) - theta_ref_val) <= band)
-        metrics_fixed.Ts = results.t_fixed(i);
+
+metrics_fixed.Ts_track = NaN;
+for i = 1:idx_track_end_fixed
+    if all(abs(results.theta_fixed(i:idx_track_end_fixed) - theta_ref_val) <= band)
+        metrics_fixed.Ts_track = results.t_fixed(i);
         break;
     end
+end
+
+metrics_fixed.Ts_recovery = NaN;
+for i = idx_enter_fixed:length(results.t_fixed)
+    if all(abs(results.theta_fixed(i:end) - theta_ref_val) <= band)
+        metrics_fixed.Ts_recovery = results.t_fixed(i) - t_water_enter_val;
+        break;
+    end
+end
+
+metrics_fixed.Ts = NaN;
+for i = length(results.t_fixed):-1:1
+    if abs(results.theta_fixed(i) - theta_ref_val) > band
+        if i < length(results.t_fixed)
+            metrics_fixed.Ts = results.t_fixed(i+1);
+        else
+            metrics_fixed.Ts = results.t_fixed(end);
+        end
+        break;
+    end
+end
+if isnan(metrics_fixed.Ts)
+    metrics_fixed.Ts = results.t_fixed(1);
 end
 
 % 方案2指标
 metrics_ab = struct();
 metrics_ab.Mp = (max(results.theta_ab) - theta_ref_val) / abs(theta_ref_val) * 100;
 metrics_ab.ess = abs(results.theta_ab(end) - theta_ref_val);
-metrics_ab.Ts = NaN;
-for i = 1:length(results.t_ab)
-    if all(abs(results.theta_ab(i:end) - theta_ref_val) <= band)
-        metrics_ab.Ts = results.t_ab(i);
+
+metrics_ab.Ts_track = NaN;
+for i = 1:idx_track_end_ab
+    if all(abs(results.theta_ab(i:idx_track_end_ab) - theta_ref_val) <= band)
+        metrics_ab.Ts_track = results.t_ab(i);
         break;
     end
+end
+
+metrics_ab.Ts_recovery = NaN;
+for i = idx_enter_ab:length(results.t_ab)
+    if all(abs(results.theta_ab(i:end) - theta_ref_val) <= band)
+        metrics_ab.Ts_recovery = results.t_ab(i) - t_water_enter_val;
+        break;
+    end
+end
+
+metrics_ab.Ts = NaN;
+for i = length(results.t_ab):-1:1
+    if abs(results.theta_ab(i) - theta_ref_val) > band
+        if i < length(results.t_ab)
+            metrics_ab.Ts = results.t_ab(i+1);
+        else
+            metrics_ab.Ts = results.t_ab(end);
+        end
+        break;
+    end
+end
+if isnan(metrics_ab.Ts)
+    metrics_ab.Ts = results.t_ab(1);
 end
 
 % 方案3指标
 metrics_abc = struct();
 metrics_abc.Mp = (max(results.theta_abc) - theta_ref_val) / abs(theta_ref_val) * 100;
 metrics_abc.ess = abs(results.theta_abc(end) - theta_ref_val);
-metrics_abc.Ts = NaN;
-for i = 1:length(results.t_abc)
-    if all(abs(results.theta_abc(i:end) - theta_ref_val) <= band)
-        metrics_abc.Ts = results.t_abc(i);
+
+metrics_abc.Ts_track = NaN;
+for i = 1:idx_track_end_abc
+    if all(abs(results.theta_abc(i:idx_track_end_abc) - theta_ref_val) <= band)
+        metrics_abc.Ts_track = results.t_abc(i);
         break;
     end
+end
+
+metrics_abc.Ts_recovery = NaN;
+for i = idx_enter_abc:length(results.t_abc)
+    if all(abs(results.theta_abc(i:end) - theta_ref_val) <= band)
+        metrics_abc.Ts_recovery = results.t_abc(i) - t_water_enter_val;
+        break;
+    end
+end
+
+metrics_abc.Ts = NaN;
+for i = length(results.t_abc):-1:1
+    if abs(results.theta_abc(i) - theta_ref_val) > band
+        if i < length(results.t_abc)
+            metrics_abc.Ts = results.t_abc(i+1);
+        else
+            metrics_abc.Ts = results.t_abc(end);
+        end
+        break;
+    end
+end
+if isnan(metrics_abc.Ts)
+    metrics_abc.Ts = results.t_abc(1);
 end
 
 % 计算能耗
@@ -221,12 +303,12 @@ energy_fixed = trapz(results.t_fixed, abs(results.Mpid_fixed));
 energy_ab = trapz(results.t_ab, abs(results.Mpid_ab));
 energy_abc = trapz(results.t_abc, abs(results.Mpid_abc));
 
-fprintf('  方案1: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
-    metrics_fixed.Mp, metrics_fixed.Ts, metrics_fixed.ess);
-fprintf('  方案2: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
-    metrics_ab.Mp, metrics_ab.Ts, metrics_ab.ess);
-fprintf('  方案3: Mp=%.2f%%, Ts=%.3fs, ess=%.5f\n', ...
-    metrics_abc.Mp, metrics_abc.Ts, metrics_abc.ess);
+fprintf('  方案1: Mp=%.2f%%, Ts_跟踪=%.3fs, Ts_恢复=%.3fs, Ts_全程=%.3fs, ess=%.5f\n', ...
+    metrics_fixed.Mp, metrics_fixed.Ts_track, metrics_fixed.Ts_recovery, metrics_fixed.Ts, metrics_fixed.ess);
+fprintf('  方案2: Mp=%.2f%%, Ts_跟踪=%.3fs, Ts_恢复=%.3fs, Ts_全程=%.3fs, ess=%.5f\n', ...
+    metrics_ab.Mp, metrics_ab.Ts_track, metrics_ab.Ts_recovery, metrics_ab.Ts, metrics_ab.ess);
+fprintf('  方案3: Mp=%.2f%%, Ts_跟踪=%.3fs, Ts_恢复=%.3fs, Ts_全程=%.3fs, ess=%.5f\n', ...
+    metrics_abc.Mp, metrics_abc.Ts_track, metrics_abc.Ts_recovery, metrics_abc.Ts, metrics_abc.ess);
 
 %% ========== 图表5：多方案姿态对比 + 局部放大（4.2.2）==========
 
@@ -243,7 +325,7 @@ plot(results.t_ab, results.theta_ab, '--', 'Color', color_scheme2, 'LineWidth', 
 plot(results.t_abc, results.theta_abc, '-', 'Color', color_scheme3, 'LineWidth', 2.5);
 yline(theta_ref_val, '--', 'Color', [0.50, 0.50, 0.50], 'LineWidth', 1.5);
 
-xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
+xline(t_water_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
     'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top', 'FontName', 'SimSun');
 
 grid on;
@@ -254,25 +336,25 @@ title('多方案姿态响应对比', 'FontSize', 16, 'FontWeight', 'bold', 'Font
 legend({'固定 PID', '固定 PID + 扰动观测器', '变参数 PID + 扰动观测器（本文方法）', '参考值'}, ...
     'Location', 'best', 'FontSize', 11, 'Box', 'on', 'FontName', 'SimSun');
 
-% 嵌入子图：放大入水瞬间
-h_inset = axes('Position', [0.6, 0.6, 0.28, 0.28]);
+% 嵌入子图：放大11s入水瞬间
+h_inset = axes('Position', [0.65, 0.6, 0.20, 0.28]);
 set(h_inset, 'FontName', 'SimSun');
-idx_fixed = find(results.t_fixed >= 1.8 & results.t_fixed <= 2.5);
-idx_ab = find(results.t_ab >= 1.8 & results.t_ab <= 2.5);
-idx_abc = find(results.t_abc >= 1.8 & results.t_abc <= 2.5);
+idx_fixed = find(results.t_fixed >= 10.5 & results.t_fixed <= 12);
+idx_ab = find(results.t_ab >= 10.5 & results.t_ab <= 12);
+idx_abc = find(results.t_abc >= 10.5 & results.t_abc <= 12);
 
 plot(results.t_fixed(idx_fixed), results.theta_fixed(idx_fixed), '-', 'Color', color_scheme1, 'LineWidth', 2.5);
 hold on;
 plot(results.t_ab(idx_ab), results.theta_ab(idx_ab), '--', 'Color', color_scheme2, 'LineWidth', 2.5);
 plot(results.t_abc(idx_abc), results.theta_abc(idx_abc), '-', 'Color', color_scheme3, 'LineWidth', 3);
 yline(theta_ref_val, '--', 'Color', [0.50, 0.50, 0.50], 'LineWidth', 1.5);
-xline(t_enter_val, '-', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
+xline(t_water_enter_val, '-', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
     'Label', '入水时刻', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top', 'FontName', 'SimSun');
-xlim([1.8, 2.5]);
+xlim([11, 12]);
 grid on;
 xlabel('时间 (s)', 'FontSize', 10, 'FontName', 'SimSun');
 ylabel('姿态角 θ (rad)', 'FontSize', 10, 'FontName', 'SimSun');
-title('局部放大：入水瞬间', 'FontSize', 11, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('局部放大：11s入水瞬间', 'FontSize', 11, 'FontWeight', 'bold', 'FontName', 'SimSun');
 set(h_inset, 'FontSize', 9, 'FontName', 'SimSun');
 box on;
 

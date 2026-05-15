@@ -107,7 +107,8 @@ for i = 1:size(signals_to_export, 1)
 end
 
 theta_ref_val = evalin('base', 'theta_ref');
-t_enter_val = evalin('base', 't_enter');
+t_fold_start_val = evalin('base', 't_fold_start');
+t_water_enter_val = evalin('base', 't_water_enter');
 
 %% ===== 步骤5：计算性能指标 =====
 
@@ -127,7 +128,31 @@ end
 
 ess = abs(data.theta(end) - theta_ref_val);
 
-fprintf('  超调量: %.2f%%, 调节时间: %.3fs, 稳态误差: %.5f rad\n', Mp, Ts, ess);
+idx_track_end = find(t <= t_fold_start_val);
+if isempty(idx_track_end)
+    idx_track_end = 1:length(t);
+end
+Ts_track = NaN;
+for i = idx_track_end(1):idx_track_end(end)
+    if all(abs(data.theta(i:idx_track_end(end)) - theta_ref_val) <= band)
+        Ts_track = t(i);
+        break;
+    end
+end
+
+idx_water_enter = find(t >= t_water_enter_val, 1);
+Ts_recovery = NaN;
+if ~isempty(idx_water_enter)
+    for i = idx_water_enter:length(t)
+        if all(abs(data.theta(i:end) - theta_ref_val) <= band)
+            Ts_recovery = t(i) - t_water_enter_val;
+            break;
+        end
+    end
+end
+
+fprintf('  超调量: %.2f%%, 全程调节时间: %.3fs, 稳态误差: %.5f rad\n', Mp, Ts, ess);
+fprintf('  0~2s跟踪调节时间: %.3fs, 11s后恢复时间: %.3fs\n', Ts_track, Ts_recovery);
 
 %% ========== 图表1：姿态角时域响应曲线（4.1.2）==========
 
@@ -149,7 +174,7 @@ yline(theta_ref_val, '--', 'Color', color_ref, 'LineWidth', 1.5);
 yline(theta_ref_val + band, ':', 'Color', color_band, 'LineWidth', 1.2, 'HandleVisibility', 'off');
 yline(theta_ref_val - band, ':', 'Color', color_band, 'LineWidth', 1.2, 'HandleVisibility', 'off');
 
-xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
+xline(t_water_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
     'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
 
 plot(t(idx_max), theta_max, 'o', 'MarkerSize', 12, ...
@@ -174,9 +199,9 @@ title('姿态角响应曲线', 'FontSize', 16, 'FontWeight', 'bold', 'FontName',
 legend({'响应曲线', '参考值', '峰值点'}, ...
     'Location', 'best', 'FontSize', 12, 'Box', 'on', 'FontName', 'SimSun');
 
-h_inset = axes('Position', [0.55, 0.2, 0.32, 0.25]);
+h_inset = axes('Position', [0.65, 0.2, 0.20, 0.25]);
 set(h_inset, 'FontName', 'SimSun');
-idx_steady = find(t >= 8 & t <= 10);
+idx_steady = find(t >= 16 & t <= 20);
 plot(t(idx_steady), data.theta(idx_steady), '-', 'Color', color_response, 'LineWidth', 2.5);
 hold on;
 yline(theta_ref_val, '--', 'Color', color_ref, 'LineWidth', 1.5);
@@ -185,7 +210,7 @@ yline(theta_ref_val - band, ':', 'Color', color_band, 'LineWidth', 1.2);
 grid on;
 xlabel('时间 (s)', 'FontSize', 11, 'FontName', 'SimSun');
 ylabel('姿态角 θ (rad)', 'FontSize', 11, 'FontName', 'SimSun');
-title('稳态误差放大', 'FontSize', 12, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('11s后稳态误差放大', 'FontSize', 12, 'FontWeight', 'bold', 'FontName', 'SimSun');
 set(h_inset, 'FontSize', 10, 'FontName', 'SimSun');
 box on;
 
@@ -206,8 +231,8 @@ color_omega = [0.00, 0.45, 0.74];
 plot(t, data.omega, '-', 'Color', color_omega, 'LineWidth', 2.2);
 hold on;
 yline(0, '--', 'Color', [0.50, 0.50, 0.50], 'LineWidth', 1.2);
-xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
-    'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
+xline(t_water_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
+    'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'bottom');
 
 grid on;
 set(gca, 'FontSize', 12, 'FontName', 'SimSun');
@@ -246,7 +271,7 @@ Ki_t = Ki0 * exp(-c_theta * abs(data.theta));
 subplot(3, 1, 1);
 plot(t, Kp_t, '-', 'Color', color_Kp, 'LineWidth', 1.2);
 hold on;
-xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
+xline(t_water_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
     'Label', '入水时刻', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
 grid on;
 set(gca, 'FontSize', 11, 'FontName', 'SimSun');
@@ -257,7 +282,7 @@ legend({'Kp(t) = Kp0 + a|ω|'}, 'Location', 'best', 'FontSize', 10, 'FontName', 
 subplot(3, 1, 2);
 plot(t, Kd_t, '-', 'Color', color_Kd, 'LineWidth', 1.2);
 hold on;
-xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
+xline(t_water_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
     'Label', '入水时刻', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
 grid on;
 set(gca, 'FontSize', 11, 'FontName', 'SimSun');
@@ -268,7 +293,7 @@ legend({'Kd(t) = Kd0 + b|ω|'}, 'Location', 'best', 'FontSize', 10, 'FontName', 
 subplot(3, 1, 3);
 plot(t, Ki_t, '-', 'Color', color_Ki, 'LineWidth', 1.2);
 hold on;
-xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
+xline(t_water_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5, ...
     'Label', '入水时刻', 'FontSize', 10, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'top');
 grid on;
 set(gca, 'FontSize', 11, 'FontName', 'SimSun');
@@ -307,7 +332,7 @@ fill([t; flipud(t)], [M_total; flipud(data.M_pid)], ...
 plot(t, M_total, '-', 'Color', color_total, 'LineWidth', 2.5);
 plot(t, data.M_pid, '--', 'Color', [0.15, 0.45, 0.75], 'LineWidth', 2);
 
-xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
+xline(t_water_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 2, ...
     'Label', '入水时刻', 'FontSize', 11, 'FontWeight', 'bold', 'LabelVerticalAlignment', 'bottom');
 
 [~, idx_impact] = max(abs(M_total));
@@ -325,10 +350,10 @@ legend({'PID控制力矩', '扰动补偿', ...
         '总力矩', 'PID力矩边界', '入水时刻'}, ...
     'Location', 'best', 'FontSize', 11, 'Box', 'on', 'FontName', 'SimSun');
 
-% 添加嵌入子图：放大1.5-2.5s
-h_inset = axes('Position', [0.55, 0.2, 0.32, 0.28]);
+% 添加嵌入子图：放大11s附近入水冲击
+h_inset = axes('Position', [0.65, 0.2, 0.20, 0.28]);
 set(h_inset, 'FontName', 'SimSun');
-idx_zoom = find(t >= 1.5 & t <= 2.5);
+idx_zoom = find(t >= 10.5 & t <= 11.5);
 
 fill([t(idx_zoom); flipud(t(idx_zoom))], ...
     [data.M_pid(idx_zoom); zeros(length(idx_zoom), 1)], ...
@@ -342,14 +367,14 @@ fill([t(idx_zoom); flipud(t(idx_zoom))], ...
 plot(t(idx_zoom), M_total(idx_zoom), '-', 'Color', color_total, 'LineWidth', 2);
 plot(t(idx_zoom), data.M_pid(idx_zoom), '--', 'Color', [0.15, 0.45, 0.75], 'LineWidth', 1.5);
 
-xline(t_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5);
+xline(t_water_enter_val, '--', 'Color', [0.80, 0.20, 0.20], 'LineWidth', 1.5);
 
 grid on;
 xlabel('时间 (s)', 'FontSize', 10, 'FontName', 'SimSun');
 ylabel('力矩 (N·m)', 'FontSize', 10, 'FontName', 'SimSun');
-title('局部放大：1.5-2.5 s', 'FontSize', 11, 'FontWeight', 'bold', 'FontName', 'SimSun');
+title('局部放大：11s入水冲击', 'FontSize', 11, 'FontWeight', 'bold', 'FontName', 'SimSun');
 set(h_inset, 'FontSize', 9, 'FontName', 'SimSun');
-xlim([1.5, 2.5]);
+xlim([10.5, 11.5]);
 box on;
 
 saveas(figure3, 'figure4_3_control_torque.png');
