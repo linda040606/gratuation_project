@@ -27,7 +27,7 @@ open_system(model);
 
 % 仿真设置
 set_param(model, 'Solver', 'ode45');
-set_param(model, 'StopTime', '10');
+set_param(model, 'StopTime', '20');
 set_param(model, 'MaxStep', '1e-3');
 set_param(model, 'SaveTime', 'on', 'TimeSaveName', 'tout');
 set_param(model, 'SaveOutput', 'on', 'OutputSaveName', 'yout');
@@ -270,69 +270,77 @@ delete_block([wd '/Out1']);
 % 输入：M
 add_block('simulink/Sources/In1', [wd '/M_in'], 'Position', [25, 105, 55, 125]);
 
-% 时变参数 J(t), D(t), ratio
+% 时变参数：收翼比例与入水比例
 add_block('simulink/Sources/Clock', [wd '/Clock'], 'Position', [25, 20, 55, 40]);
-add_block('simulink/Sources/Constant', [wd '/Neg_t_enter'], 'Position', [70, 20, 130, 40]);
-set_param([wd '/Neg_t_enter'], 'Value', '-t_enter');
-add_block('simulink/Math Operations/Add', [wd '/Time_Shift'], 'Position', [155, 20, 185, 50]);
-add_block('simulink/Math Operations/Gain', [wd '/Inv_t_blend'], 'Position', [210, 20, 250, 50]);
-set_param([wd '/Inv_t_blend'], 'Gain', '1/t_blend');
-add_block('simulink/Discontinuities/Saturation', [wd '/Ratio_Sat'], 'Position', [275, 20, 315, 50]);
-set_param([wd '/Ratio_Sat'], 'UpperLimit', '1', 'LowerLimit', '0');
-add_block('simulink/User-Defined Functions/Fcn', [wd '/Smoothstep'], 'Position', [340, 20, 410, 50]);
+
+% 收翼比例：2s 开始，9s 内从 0 变化到 1
+add_block('simulink/Sources/Constant', [wd '/Neg_t_fold_start'], 'Position', [70, 20, 130, 40]);
+set_param([wd '/Neg_t_fold_start'], 'Value', '-t_fold_start');
+add_block('simulink/Math Operations/Add', [wd '/Time_Shift_Fold'], 'Position', [155, 20, 185, 50]);
+add_block('simulink/Math Operations/Gain', [wd '/Inv_t_fold_duration'], 'Position', [210, 20, 260, 50]);
+set_param([wd '/Inv_t_fold_duration'], 'Gain', '1/t_fold_duration');
+add_block('simulink/Discontinuities/Saturation', [wd '/Fold_Ratio_Sat'], 'Position', [285, 20, 325, 50]);
+set_param([wd '/Fold_Ratio_Sat'], 'UpperLimit', '1', 'LowerLimit', '0');
+add_block('simulink/User-Defined Functions/Fcn', [wd '/Smoothstep'], 'Position', [350, 20, 420, 50]);
 set_param([wd '/Smoothstep'], 'Expr', 'u*u*(3-2*u)');
 
-% J_t
-add_block('simulink/Sources/Constant', [wd '/J_air'], 'Position', [440, 10, 490, 30]);
+% 入水比例：收翼完成后快速切换，并在入水后保持不变
+add_block('simulink/Sources/Constant', [wd '/Neg_t_water_enter'], 'Position', [70, 70, 130, 90]);
+set_param([wd '/Neg_t_water_enter'], 'Value', '-t_water_enter');
+add_block('simulink/Math Operations/Add', [wd '/Time_Shift_Water'], 'Position', [155, 70, 185, 100]);
+add_block('simulink/Math Operations/Gain', [wd '/Inv_t_water_blend'], 'Position', [210, 70, 260, 100]);
+set_param([wd '/Inv_t_water_blend'], 'Gain', '1/t_water_blend');
+add_block('simulink/Discontinuities/Saturation', [wd '/Ratio_Sat'], 'Position', [285, 70, 325, 100]);
+set_param([wd '/Ratio_Sat'], 'UpperLimit', '1', 'LowerLimit', '0');
+
+% J_t：先收翼降惯量，再在入水后切换到水下定值
+add_block('simulink/Sources/Constant', [wd '/J_air'], 'Position', [450, 10, 500, 30]);
 set_param([wd '/J_air'], 'Value', 'J_air');
-add_block('simulink/Sources/Constant', [wd '/Delta_J'], 'Position', [440, 40, 500, 60]);
-set_param([wd '/Delta_J'], 'Value', 'J_water-J_air');
-add_block('simulink/Math Operations/Product', [wd '/J_Delta_Product'], 'Position', [530, 30, 570, 60]);
-add_block('simulink/Math Operations/Add', [wd '/J_t_Sum'], 'Position', [600, 20, 630, 50]);
+add_block('simulink/Sources/Constant', [wd '/J_Wing_Reduction'], 'Position', [450, 40, 520, 60]);
+set_param([wd '/J_Wing_Reduction'], 'Value', 'J_wing_reduction');
+add_block('simulink/Math Operations/Product', [wd '/J_Fold_Product'], 'Position', [545, 30, 585, 60]);
+add_block('simulink/Math Operations/Add', [wd '/J_t_Folded'], 'Position', [615, 20, 645, 50]);
+set_param([wd '/J_t_Folded'], 'Inputs', '+-');
+add_block('simulink/Sources/Constant', [wd '/Delta_J_Water'], 'Position', [450, 75, 530, 95]);
+set_param([wd '/Delta_J_Water'], 'Value', 'J_water-(J_air-J_wing_reduction)');
+add_block('simulink/Math Operations/Product', [wd '/J_Water_Product'], 'Position', [545, 80, 585, 110]);
+add_block('simulink/Math Operations/Add', [wd '/J_t_Sum'], 'Position', [615, 75, 645, 105]);
 
-% D_t
-add_block('simulink/Sources/Constant', [wd '/D_air'], 'Position', [440, 80, 490, 100]);
+% D_t：仅在入水后从空气值快速切换到水下值
+add_block('simulink/Sources/Constant', [wd '/D_air'], 'Position', [450, 130, 500, 150]);
 set_param([wd '/D_air'], 'Value', 'D_air');
-add_block('simulink/Sources/Constant', [wd '/Delta_D'], 'Position', [440, 110, 500, 130]);
+add_block('simulink/Sources/Constant', [wd '/Delta_D'], 'Position', [450, 160, 520, 180]);
 set_param([wd '/Delta_D'], 'Value', 'D_water-D_air');
-add_block('simulink/Math Operations/Product', [wd '/D_Delta_Product'], 'Position', [530, 100, 570, 130]);
-add_block('simulink/Math Operations/Add', [wd '/D_t_Sum'], 'Position', [600, 90, 630, 120]);
+add_block('simulink/Math Operations/Product', [wd '/D_Delta_Product'], 'Position', [545, 150, 585, 180]);
+add_block('simulink/Math Operations/Add', [wd '/D_t_Sum'], 'Position', [615, 145, 645, 175]);
 
-% ========== 入水冲击项建模 ==========
-% 目标：M_total = M + A_impact * exp(-(t - t_enter)/tau_impact), t >= t_enter
+% 收翼带来的附加俯仰力矩
+add_block('simulink/Sources/Constant', [wd '/M_Wing_Constant'], 'Position', [450, 210, 520, 230]);
+set_param([wd '/M_Wing_Constant'], 'Value', 'M_wing');
+add_block('simulink/Math Operations/Product', [wd '/M_Wing_Product'], 'Position', [545, 205, 585, 235]);
 
-% 时间偏移：计算 (t - t_enter)
-add_block('simulink/Sources/Clock', [wd '/Clock_Impact']);
-add_block('simulink/Sources/Constant', [wd '/Neg_t_enter_Impact']);
-set_param([wd '/Neg_t_enter_Impact'], 'Value', '-t_enter');
-add_block('simulink/Math Operations/Add', [wd '/Time_Shift_Impact']);
-
-% 指数衰减：exp(-(t - t_enter)/tau_impact)
-add_block('simulink/Math Operations/Gain', [wd '/Impact_Decay']);
+% 入水冲击项：11s 触发后指数衰减
+add_block('simulink/Math Operations/Gain', [wd '/Impact_Decay'], 'Position', [350, 250, 390, 280]);
 set_param([wd '/Impact_Decay'], 'Gain', '-1/tau_impact');
-add_block('simulink/Math Operations/Math Function', [wd '/Exp_Impact']);
+add_block('simulink/Math Operations/Math Function', [wd '/Exp_Impact'], 'Position', [415, 250, 455, 280]);
 set_param([wd '/Exp_Impact'], 'Operator', 'exp');
-
-% 冲击幅值
-add_block('simulink/Sources/Constant', [wd '/Impact_Amp']);
+add_block('simulink/Sources/Constant', [wd '/Impact_Amp'], 'Position', [450, 285, 520, 305]);
 set_param([wd '/Impact_Amp'], 'Value', 'A_impact');
-add_block('simulink/Math Operations/Product', [wd '/Impact_Product']);
-
-% 触发条件：(t - t_enter) >= 0
-add_block('simulink/Logic and Bit Operations/Compare To Constant', [wd '/Impact_Enable']);
+add_block('simulink/Math Operations/Product', [wd '/Impact_Product'], 'Position', [545, 250, 585, 280]);
+add_block('simulink/Logic and Bit Operations/Compare To Constant', [wd '/Impact_Enable'], 'Position', [215, 250, 305, 280]);
 set_param([wd '/Impact_Enable'], 'const', '0', 'relop', '>=');
+add_block('simulink/Sources/Constant', [wd '/Impact_Zero'], 'Position', [545, 290, 585, 310]);
+set_param([wd '/Impact_Zero'], 'Value', '0');
+add_block('simulink/Signal Routing/Switch', [wd '/Impact_Switch'], 'Position', [615, 250, 655, 290]);
 
-% Switch：仅在 t >= t_enter 时输出冲击
-add_block('simulink/Signal Routing/Switch', [wd '/Impact_Switch']);
+add_block('simulink/Math Operations/Add', [wd '/M_with_Impact'], 'Position', [300, 135, 330, 165]);
+set_param([wd '/M_with_Impact'], 'Inputs', '+++');
 
-% M_total = M + Impact
-add_block('simulink/Math Operations/Add', [wd '/M_with_Impact']);
-
-% J̇·ω项：对α(t)求导得到dJ/dt，再乘以ω
-add_block('simulink/Continuous/Derivative', [wd '/Jdot_Deriv'], 'Position', [280, 70, 320, 100]);
-add_block('simulink/Math Operations/Gain', [wd '/Jdot_Gain'], 'Position', [345, 70, 385, 100]);
-set_param([wd '/Jdot_Gain'], 'Gain', 'J_water-J_air');
-add_block('simulink/Math Operations/Product', [wd '/Jdot_Omega_Product'], 'Position', [410, 70, 450, 100]);
+% J̇·ω项：只由收翼过程引起
+add_block('simulink/Continuous/Derivative', [wd '/Jdot_Deriv'], 'Position', [350, 110, 390, 140]);
+add_block('simulink/Math Operations/Gain', [wd '/Jdot_Gain'], 'Position', [415, 110, 455, 140]);
+set_param([wd '/Jdot_Gain'], 'Gain', 'J_wing_reduction');
+add_block('simulink/Math Operations/Product', [wd '/Jdot_Omega_Product'], 'Position', [480, 110, 520, 140]);
 
 % 动力学主方程：J*omega_dot = M - D*omega - K*theta - Jdot*omega
 add_block('simulink/Math Operations/Product', [wd '/Domega_Product'], 'Position', [220, 170, 260, 200]);
@@ -356,42 +364,47 @@ add_block('simulink/Sinks/Out1', [wd '/Jt_out'], 'Position', [700, 20, 730, 40])
 add_block('simulink/Sinks/Out1', [wd '/Dt_out'], 'Position', [700, 80, 730, 100]);
 add_block('simulink/Sinks/Out1', [wd '/ratio_out'], 'Position', [700, 120, 730, 140]);
 
-% 连线：ratio 与 J/D
-add_line(wd, 'Clock/1', 'Time_Shift/1');
-add_line(wd, 'Neg_t_enter/1', 'Time_Shift/2');
-add_line(wd, 'Time_Shift/1', 'Inv_t_blend/1');
-add_line(wd, 'Inv_t_blend/1', 'Ratio_Sat/1');
-% 绕过 Smoothstep，直接使用 Ratio_Sat 实现阶跃式入水
+% 连线：收翼比例与入水比例
+add_line(wd, 'Clock/1', 'Time_Shift_Fold/1');
+add_line(wd, 'Neg_t_fold_start/1', 'Time_Shift_Fold/2');
+add_line(wd, 'Time_Shift_Fold/1', 'Inv_t_fold_duration/1');
+add_line(wd, 'Inv_t_fold_duration/1', 'Fold_Ratio_Sat/1');
+add_line(wd, 'Fold_Ratio_Sat/1', 'Smoothstep/1');
 
-add_line(wd, 'Ratio_Sat/1', 'J_Delta_Product/1');
-add_line(wd, 'Delta_J/1', 'J_Delta_Product/2');
-add_line(wd, 'J_air/1', 'J_t_Sum/1');
-add_line(wd, 'J_Delta_Product/1', 'J_t_Sum/2');
+add_line(wd, 'Clock/1', 'Time_Shift_Water/1');
+add_line(wd, 'Neg_t_water_enter/1', 'Time_Shift_Water/2');
+add_line(wd, 'Time_Shift_Water/1', 'Inv_t_water_blend/1');
+add_line(wd, 'Inv_t_water_blend/1', 'Ratio_Sat/1');
 
+% J_t：收翼先降低惯量，入水后快速切换到水下定值
+add_line(wd, 'Smoothstep/1', 'J_Fold_Product/1');
+add_line(wd, 'J_Wing_Reduction/1', 'J_Fold_Product/2');
+add_line(wd, 'J_air/1', 'J_t_Folded/1');
+add_line(wd, 'J_Fold_Product/1', 'J_t_Folded/2');
+add_line(wd, 'Ratio_Sat/1', 'J_Water_Product/1');
+add_line(wd, 'Delta_J_Water/1', 'J_Water_Product/2');
+add_line(wd, 'J_t_Folded/1', 'J_t_Sum/1');
+add_line(wd, 'J_Water_Product/1', 'J_t_Sum/2');
+
+% D_t：入水后快速增大阻尼
 add_line(wd, 'Ratio_Sat/1', 'D_Delta_Product/1');
 add_line(wd, 'Delta_D/1', 'D_Delta_Product/2');
 add_line(wd, 'D_air/1', 'D_t_Sum/1');
 add_line(wd, 'D_Delta_Product/1', 'D_t_Sum/2');
 
-% ========== 冲击项连线 ==========
-% 时间偏移：Clock_Impact + (-t_enter) = (t - t_enter)
-add_line(wd, 'Clock_Impact/1', 'Time_Shift_Impact/1');
-add_line(wd, 'Neg_t_enter_Impact/1', 'Time_Shift_Impact/2');
+% 收翼附加俯仰力矩
+add_line(wd, 'Smoothstep/1', 'M_Wing_Product/1');
+add_line(wd, 'M_Wing_Constant/1', 'M_Wing_Product/2');
 
-% 指数衰减链：(t - t_enter) → Gain(-1/tau) → Exp
-add_line(wd, 'Time_Shift_Impact/1', 'Impact_Decay/1');
+% 入水冲击：11s 触发后指数衰减
+add_line(wd, 'Time_Shift_Water/1', 'Impact_Enable/1');
+add_line(wd, 'Time_Shift_Water/1', 'Impact_Decay/1');
 add_line(wd, 'Impact_Decay/1', 'Exp_Impact/1');
-
-% 幅值：Exp × A_impact → Impact
 add_line(wd, 'Exp_Impact/1', 'Impact_Product/1');
 add_line(wd, 'Impact_Amp/1', 'Impact_Product/2');
-
-% 触发条件：(t - t_enter) >= 0
-add_line(wd, 'Time_Shift_Impact/1', 'Impact_Enable/1');
-
-% Switch：Impact_Product → in1, Impact_Enable → cond, 0 → in2 (默认)
 add_line(wd, 'Impact_Product/1', 'Impact_Switch/1');
 add_line(wd, 'Impact_Enable/1', 'Impact_Switch/2');
+add_line(wd, 'Impact_Zero/1', 'Impact_Switch/3');
 
 % 连线：动力学方程
 add_line(wd, 'D_t_Sum/1', 'Domega_Product/1');
@@ -399,13 +412,14 @@ add_line(wd, 'Omega_Int/1', 'Domega_Product/2');
 add_line(wd, 'Theta_Int/1', 'Ktheta_Gain/1');
 
 add_line(wd, 'M_in/1', 'M_with_Impact/1');
-add_line(wd, 'Impact_Switch/1', 'M_with_Impact/2');
+add_line(wd, 'M_Wing_Product/1', 'M_with_Impact/2');
+add_line(wd, 'Impact_Switch/1', 'M_with_Impact/3');
 add_line(wd, 'M_with_Impact/1', 'OmegaDot_Num/1');
 add_line(wd, 'Domega_Product/1', 'OmegaDot_Num/2');
 add_line(wd, 'Ktheta_Gain/1', 'OmegaDot_Num/3');
 
-% J̇·ω 连线：α(t) → dα/dt → dJ/dt → J̇·ω → OmegaDot_Num
-add_line(wd, 'Ratio_Sat/1', 'Jdot_Deriv/1');
+% J̇·ω 连线：收翼比例 → dJ/dt → J̇·ω → OmegaDot_Num
+add_line(wd, 'Smoothstep/1', 'Jdot_Deriv/1');
 add_line(wd, 'Jdot_Deriv/1', 'Jdot_Gain/1');
 add_line(wd, 'Jdot_Gain/1', 'Jdot_Omega_Product/1');
 add_line(wd, 'Omega_Int/1', 'Jdot_Omega_Product/2');
@@ -421,7 +435,7 @@ add_line(wd, 'Omega_Int/1', 'omega_out/1');
 add_line(wd, 'Theta_Int/1', 'theta_out/1');
 add_line(wd, 'J_t_Sum/1', 'Jt_out/1');
 add_line(wd, 'D_t_Sum/1', 'Dt_out/1');
-add_line(wd, 'Ratio_Sat/1', 'ratio_out/1');
+add_line(wd, 'Smoothstep/1', 'ratio_out/1');
 
 %% ===== 顶层连线 =====
 % Water_Dynamics -> Signal_Interface
@@ -489,15 +503,21 @@ D_air = 0.5;
 D_water = 2.0;
 K_theta = 1.2;
 
-% 初值与切换
+% 初值与时序
 theta0 = 0;
 omega0 = 0;
-t_enter = 2.0;
-t_blend = 0.02;   % 20 ms 毫秒级入水
+t_fold_start = 2.0;
+t_fold_duration = 9.0;
+t_water_enter = 11.0;
+t_water_blend = 0.05;
 
-% 入水冲击参数
-A_impact = 100;      % 冲击强度（建议100~300）
-tau_impact = 0.05;   % 衰减时间常数（20ms）
+% 收翼扰动参数
+M_wing = 0.78;
+J_wing_reduction = 0.056 * J_air;
+
+% 入水冲击参数（11s 入水时触发）
+A_impact = 100;
+tau_impact = 0.05;
 
 % 观测器（修正后使用适中参数）
 tau_eso = 0.01;  % 适中值，平衡响应速度和噪声抑制
@@ -519,8 +539,12 @@ assignin('base', 'D_water', D_water);
 assignin('base', 'K_theta', K_theta);
 assignin('base', 'theta0', theta0);
 assignin('base', 'omega0', omega0);
-assignin('base', 't_enter', t_enter);
-assignin('base', 't_blend', t_blend);
+assignin('base', 't_fold_start', t_fold_start);
+assignin('base', 't_fold_duration', t_fold_duration);
+assignin('base', 't_water_enter', t_water_enter);
+assignin('base', 't_water_blend', t_water_blend);
+assignin('base', 'M_wing', M_wing);
+assignin('base', 'J_wing_reduction', J_wing_reduction);
 assignin('base', 'A_impact', A_impact);
 assignin('base', 'tau_impact', tau_impact);
 assignin('base', 'tau_eso', tau_eso);
